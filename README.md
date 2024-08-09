@@ -14,12 +14,13 @@ pip install git+https://github.com/johncolby/air_download
 
 ## Usage
 
-```
+```bash
 air_download -c /path/to/air_login.txt https://air.<domain>.edu/api/ 11111111
 ```
 
 Login credentials should be stored in a plain text file like:
-```
+
+```bash
 AIR_USERNAME=username
 AIR_PASSWORD=password
 ```
@@ -42,7 +43,7 @@ air_download https://air.<domain>.edu/api/ 11111111
 
 Type `air_download -h` for the help text.
 
-```
+```bash
 $ air_download -h
 usage: air_download [-h] [-c CRED_PATH] [-p PROFILE] [-o OUTPUT] URL ACCESSION
 
@@ -60,6 +61,8 @@ optional arguments:
                         Anonymization Profile (default: -1)
   -o OUTPUT, --output OUTPUT
                         Output path (default: ./<Accession>.zip)
+  -s SERIES_INCLUSION, --series_inclusion SERIES_INCLUSION
+                        Comma separated list of strings for series sub-selection (default: None)
 ```
 
 From within python, you can also import the module directly, so that it may be integrated with other tools.
