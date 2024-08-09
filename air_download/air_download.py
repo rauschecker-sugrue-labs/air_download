@@ -6,95 +6,193 @@ import requests
 from dotenv import dotenv_values
 from urllib.parse import urljoin
 
-def parse_args():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('URL', help='URL for AIR API, e.g. https://air.<domain>.edu/api/')
-    parser.add_argument('acc', metavar='ACCESSION', help='Accession # to download')
-    parser.add_argument('-c', '--cred_path', help='Login credentials file. If not present, will look for AIR_USERNAME and AIR_PASSWORD environment variables.', default=None)
-    parser.add_argument('-p', '--profile', help='Anonymization Profile', default=-1)
-    parser.add_argument('-o', '--output', help='Output path', default='./<Accession>.zip')
+def parse_args():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        "url", help="URL for AIR API, e.g. https://air.<domain>.edu/api/"
+    )
+    parser.add_argument("acc", metavar="ACCESSION", help="Accession # to download")
+    parser.add_argument(
+        "-c",
+        "--cred-path",
+        help="Login credentials file. If not present,"
+        " will look for AIR_USERNAME and AIR_PASSWORD"
+        " environment variables.",
+        default=None,
+    )
+    parser.add_argument(
+        "-o", "--output", help="Output path", default="./<Accession>.zip"
+    )
+    parser.add_argument("-pf", "--profile", help="Anonymization Profile", default=-1)
+    parser.add_argument("-pj", "--project", help="Project ID", default=-1)
+    parser.add_argument(
+        "-s",
+        "--series_inclusion",
+        help="Comma-separated list of series inclusion patterns",
+        default=None,
+    )
 
     arguments = parser.parse_args()
 
-    if arguments.output == './<Accession>.zip':
-        arguments.output = '{acc}.zip'.format(acc=arguments.acc)
+    if arguments.output == "./<Accession>.zip":
+        arguments.output = "{acc}.zip".format(acc=arguments.acc)
 
     return arguments
 
-def main(args):
-    # Import login credentials
-    if args.cred_path is None:
-        userId   = os.environ.get('AIR_USERNAME')
-        password = os.environ.get('AIR_PASSWORD')
-        assert((userId and password) is not None), "AIR credentials not provided."
+
+def authenticate(url, cred_path):
+    if cred_path:
+        assert os.path.exists(
+            cred_path
+        ), f"AIR credential file ({cred_path}) does not exist."
+        envs = dotenv_values(cred_path)
+        userId = envs["AIR_USERNAME"]
+        password = envs["AIR_PASSWORD"]
     else:
-        assert(os.path.exists(args.cred_path)), f'AIR credential file ({args.cred_path}) does not exist.'
-        envs = dotenv_values(args.cred_path)
-        userId = envs['AIR_USERNAME']
-        password = envs['AIR_PASSWORD']  
-    auth_info = {
-        'userId': userId,
-        'password': password
-    }
+        userId = os.environ.get("AIR_USERNAME")
+        password = os.environ.get("AIR_PASSWORD")
+        assert (userId and password) is not None, "AIR credentials not provided."
+    auth_info = {"userId": userId, "password": password}
 
-    # Initialize AIR session and store authorization token
-    session = requests.post(urljoin(args.URL, 'login'), json = auth_info).json()
+    session = requests.post(urljoin(url, "login"), json=auth_info).json()
+    jwt = session["token"]["jwt"]
 
-    jwt = session['token']['jwt']
-    header = {'Authorization': 'Bearer ' + jwt}
+    projects = session["user"]["projects"]
+    return jwt, projects
 
-    # Search for study by accession number 
-    study = requests.post(urljoin(args.URL, 'secure/search/query-data-source'), 
-        headers = header,
-        json = {'name': '',
-                'mrn': '',
-                'accNum': args.acc,
-                'dateRange': {'start':'','end':'','label':''},
-                'modality': '',
-                'sourceId': 1
-        }).json()['exams'][0]
+
+def get_deid_profiles(url, cred_path):
+    jwt, _ = authenticate(url, cred_path)
+
+    header = {"Authorization": "Bearer " + jwt}
+    profiles = requests.post(
+        urljoin(url, "secure/anonymization/list-profiles"),
+        headers=header,
+        json={
+            "includeGlobal": True,
+            "includeCustom": True,
+            "includeDefault": False,
+            "includeInactiveCustom": False,
+            "includeInactiveGlobal": False,
+            "includeInactiveShared": False,
+            "includeShared": True,
+        },
+    ).json()
+    ret = []
+    for profile in profiles:
+        ret.append({k: profile[k] for k in ("id", "name", "description")})
+    return ret
+
+
+def download(
+    url, cred_path, accession, output, project, profile, series_inclusion=None
+):
+    jwt, _ = authenticate(url, cred_path)
+    header = {"Authorization": "Bearer " + jwt}
+
+    # Search for study by accession number
+    study = requests.post(
+        urljoin(url, "secure/search/query-data-source"),
+        headers=header,
+        json={
+            "name": "",
+            "mrn": "",
+            "accNum": accession,
+            "dateRange": {"start": "", "end": "", "label": ""},
+            "modality": "",
+            "sourceId": 1,
+        },
+    ).json()["exams"][0]
 
     # Make a list of all included series
-    series = requests.post(urljoin(args.URL, 'secure/search/series'),
-        headers = header,
-        json = study).json()
+    series = requests.post(
+        urljoin(url, "secure/search/series"), headers=header, json=study
+    ).json()
 
-    def has_started():
-        check = requests.post(urljoin(args.URL, 'secure/search/download/check'),
-            headers = header,
-            json = {'downloadId': download_info['downloadId'],
-                'projectId': -1
-            }).json()
-        return check['status'] in ['started', 'completed']
+    # Filter series based on inclusion patterns, if provided
+    if series_inclusion:
+        inclusion_list = [
+            pattern.strip().lower() for pattern in series_inclusion.split(",")
+        ]
+        original_series_description = [serie["description"] for serie in series]
+        series = [
+            serie
+            for serie in series
+            if (
+                serie["description"]
+                and any(
+                    pattern in serie["description"].lower()
+                    for pattern in inclusion_list
+                )
+            )
+        ]
+        final_series_description = [serie["description"] for serie in series]
+        print(f"Original series (n={len(original_series_description)}): ")
+        print(original_series_description)
+        print(f"Series after filtering (n={len(final_series_description)}): ")
+        print(final_series_description)
+
+    def has_started(download_info):
+        if "downloadId" not in download_info:
+            raise RuntimeError(f"download failed. Server Response: {download_info}")
+        check = requests.post(
+            urljoin(url, "secure/search/download/check"),
+            headers=header,
+            json={"downloadId": download_info["downloadId"], "projectId": project},
+        ).json()
+        return check["status"] in ["started", "completed"]
 
     # Prepare download job
-    download_info = requests.post(urljoin(args.URL, 'secure/search/download/start'),
-        headers = header,
-        json = {'decompress': False,
-                'name': 'Download.zip',
-                'profile': args.profile,
-                'projectId': -1,
-                'series': series,
-                'study': study 
-        }).json()
+    download_info = requests.post(
+        urljoin(url, "secure/search/download/start"),
+        headers=header,
+        json={
+            "decompress": False,
+            "name": "Download.zip",
+            "profile": profile,
+            "projectId": project,
+            "series": series,
+            "study": study,
+        },
+    ).json()
 
     # Ensure that archive is ready for download
-    while not has_started():
+    while not has_started(download_info):
         time.sleep(0.1)
 
     # Download archive
-    download_stream = requests.post(urljoin(args.URL, 'secure/search/download/zip'),
-        headers = {'Upgrade-Insecure-Requests': '1'},
-        data = {'params': json.dumps({'downloadId': download_info['downloadId'], 'projectId': -1, 'name': 'Download.zip'}),
-                'jwt': jwt
-        }, stream=True)
+    download_stream = requests.post(
+        urljoin(url, "secure/search/download/zip"),
+        headers={"Upgrade-Insecure-Requests": "1"},
+        data={
+            "params": json.dumps(
+                {
+                    "downloadId": download_info["downloadId"],
+                    "projectId": project,
+                    "name": "Download.zip",
+                }
+            ),
+            "jwt": jwt,
+        },
+        stream=True,
+    )
 
     # Save archive to disk
-    with open(args.output, 'wb') as fd:
+    with open(output, "wb") as fd:
         for chunk in download_stream.iter_content(chunk_size=8192):
             if chunk:
                 _ = fd.write(chunk)
+
+
+def main(args):
+    download(
+        args.url, args.cred_path, args.acc, args.output, args.project, args.profile
+    )
+
 
 def cli():
     main(parse_args())
