@@ -190,7 +190,7 @@ def download(
 
 def main(args):
     download(
-        args.url, args.cred_path, args.acc, args.output, args.project, args.profile
+        args.url, args.cred_path, args.acc, args.output, args.project, args.profile, args.series_inclusion
     )
 
 
