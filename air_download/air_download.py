@@ -4,6 +4,7 @@ import time
 import json
 import requests
 from dotenv import dotenv_values
+from tqdm import tqdm
 from urllib.parse import urljoin
 
 
@@ -181,11 +182,17 @@ def download(
         stream=True,
     )
 
-    # Save archive to disk
-    with open(output, "wb") as fd:
+   # Get total size from headers (probably not available though)
+    total_size = int(download_stream.headers.get('Content-Length', 0))
+
+    # Save archive to disk with a progress bar
+    with open(output, "wb") as fd, tqdm(
+        total=total_size, unit='B', unit_scale=True, desc=output, leave=False
+    ) as progress_bar:
         for chunk in download_stream.iter_content(chunk_size=8192):
             if chunk:
-                _ = fd.write(chunk)
+                fd.write(chunk)
+                progress_bar.update(len(chunk))
 
 
 def main(args):
