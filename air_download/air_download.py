@@ -1,5 +1,6 @@
 import os
 import argparse
+from pathlib import Path
 import time
 import json
 import requests
@@ -26,7 +27,7 @@ def parse_args():
         default=None,
     )
     parser.add_argument(
-        "-o", "--output", help="Output path", default="./<Accession>.zip"
+        "-o", "--output", help="Output path or directory", default="./<Accession>.zip"
     )
     parser.add_argument("-pf", "--profile", help="Anonymization Profile", default=-1)
     parser.add_argument("-pj", "--project", help="Project ID", default=-1)
@@ -43,7 +44,10 @@ def parse_args():
     arguments = parser.parse_args()
 
     if arguments.output == "./<Accession>.zip":
-        arguments.output = "{acc}.zip".format(acc=arguments.acc)
+        arguments.output = f"{arguments.acc}.zip"
+    elif Path(arguments.output).is_dir():
+        arguments.output = str(Path(arguments.output) / f"{arguments.acc}.zip")
+        print("Output path is a directory. Saving to: ", arguments.output, flush=True)
 
     return arguments
 
