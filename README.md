@@ -62,7 +62,7 @@ optional arguments:
   -o OUTPUT, --output OUTPUT
                         Output path (default: ./<Accession>.zip)
   -s SERIES_INCLUSION, --series_inclusion SERIES_INCLUSION
-                        Comma separated list of strings for series sub-selection (default: None)
+                        Comma-separated list of series inclusion patterns (case insensitive, 'or' logic). Example for T1 type series: 't1,spgr,bravo,mpr' (default: None)
 ```
 
 From within python, you can also import the module directly, so that it may be integrated with other tools.

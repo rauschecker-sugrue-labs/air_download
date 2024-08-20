@@ -33,7 +33,10 @@ def parse_args():
     parser.add_argument(
         "-s",
         "--series_inclusion",
-        help="Comma-separated list of series inclusion patterns",
+        help=(
+            "Comma-separated list of series inclusion patterns (case insensitive, 'or' "
+            "logic). Example for T1 type series: 't1,spgr,bravo,mpr'"
+        ),
         default=None,
     )
 
@@ -182,12 +185,12 @@ def download(
         stream=True,
     )
 
-   # Get total size from headers (probably not available though)
-    total_size = int(download_stream.headers.get('Content-Length', 0))
+    # Get total size from headers (probably not available though)
+    total_size = int(download_stream.headers.get("Content-Length", 0))
 
     # Save archive to disk with a progress bar
     with open(output, "wb") as fd, tqdm(
-        total=total_size, unit='B', unit_scale=True, desc=output, leave=False
+        total=total_size, unit="B", unit_scale=True, desc=output, leave=False
     ) as progress_bar:
         for chunk in download_stream.iter_content(chunk_size=8192):
             if chunk:
@@ -197,7 +200,13 @@ def download(
 
 def main(args):
     download(
-        args.url, args.cred_path, args.acc, args.output, args.project, args.profile, args.series_inclusion
+        args.url,
+        args.cred_path,
+        args.acc,
+        args.output,
+        args.project,
+        args.profile,
+        args.series_inclusion,
     )
 
 
