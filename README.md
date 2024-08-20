@@ -2,22 +2,41 @@
 
 This is a small wrapper interface to the AIR web API. This will help you to batch download radiology studies if you have this service available on your PACS system.
 
-## Install
+## Installation & Usage
 
+### With container
+If on Mac, use the Dockerfile to compile this package and run it in a container.  
+If on Linux, use the Singularity image to compile and run this package.
+
+For Singularity:
+```bash
+singularity build air_download.sif Singularity.def
+```
+Then, you can either use the container directly:
+```bash
+singularity run air_download.sif -h
+```
+or use the handy script [`run_air_download.py`](run_air_download.py) to run the container with the appropriate arguments. You only have to set the top 3 arguments (`AIR_API_URL`, `DEFAULT_PROJECT_ID`, `DEFAULT_ANONYMIZATION_PROFILE`) once in the script itself. If you don't yet have a `air_login.txt` file, it will prompt you to create it for you. It only requires a basic python install (no special packages).
+```bash
+python run_air_download.py -h
+```
+
+### Without container (python package)
+#### Installation
 Install the `air_download` package directly from the git repository like:
 
 ```bash
-pip install git+https://github.com/johncolby/air_download
+pip install git+https://github.com/rauschecker-sugrue-labs/air_download
 ```
 
 (modify URL if the repository lives somewhere other than github)
 
-## Usage
-
+#### Usage
 ```bash
 air_download -c /path/to/air_login.txt https://air.<domain>.edu/api/ 11111111
 ```
 
+## Note on credentials
 Login credentials should be stored in a plain text file like:
 
 ```bash
