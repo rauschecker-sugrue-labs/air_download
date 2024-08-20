@@ -1,0 +1,29 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%labels
+    Maintainer Pierre Nedelec
+    Lab Rauschecker Sugrue Labs
+
+%post
+    # Set working directory
+    cd /app
+    # Install the Python package and dependencies
+    pip install --no-cache-dir .
+
+%environment
+    # Set the PATH environment variable to ensure Singularity can find the installed package
+    export PATH="/usr/local/bin:$PATH"
+
+%runscript
+    # This is the default command that will be executed when the container is run
+    exec air_download "$@"
+
+%files
+    # Here, you specify the files to be copied into the container
+    setup.py /app/setup.py
+    air_download /app/air_download
+
+%test
+    # Basic test to ensure the image works as expected
+    air_download --help
