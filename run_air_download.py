@@ -19,7 +19,12 @@ def get_args():
     )
 
     parser.add_argument(
-        "accession", metavar="ACCESSION", help="Accession # to download"
+        "accession",
+        metavar="ACCESSION",
+        help=(
+            "Accession # to download, or path to csv file with accession #s "
+            "in one column."
+        ),
     )
     parser.add_argument(
         "-o", "--output", help="Output path", default="./<Accession>.zip"
@@ -129,29 +134,35 @@ def get_output_directory(output_path, accession):
 
 def run_container(args):
     """Run the Apptainer container with the provided arguments."""
-    output_dir = get_output_directory(args.output, args.accession)
+    accession_csv = Path(args.accession)
+    if accession_csv.is_file() and accession_csv.exists():
+        accession_list = accession_csv.read_text().strip().split("\n")
+    else:
+        accession_list = [args.accession]
 
-    # Construct the apptainer command
-    command = [
-        "apptainer",
-        "run",
-        "--bind",
-        f"{output_dir}:{output_dir}",
-        "air_download.sif",
-        AIR_API_URL,
-        args.accession,
-        "-o",
-        args.output,
-        "-pf",
-        args.profile,
-        "-pj",
-        args.project,
-    ]
+    output_dir = get_output_directory(args.output, args.accession[0])
 
-    if args.series_inclusion:
-        command.extend(["-s", args.series_inclusion])
+    for accession in accession_list:
+        command = [
+            "apptainer",
+            "run",
+            "--bind",
+            f"{output_dir}:{output_dir}",
+            "air_download.sif",
+            AIR_API_URL,
+            args.accession,
+            "-o",
+            args.output,
+            "-pf",
+            args.profile,
+            "-pj",
+            args.project,
+        ]
 
-    subprocess.run(command)
+        if args.series_inclusion:
+            command.extend(["-s", args.series_inclusion])
+
+        subprocess.run(command)
 
 
 def main():
