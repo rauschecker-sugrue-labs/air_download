@@ -80,6 +80,8 @@ optional arguments:
                         (default: None)
   -p PROFILE, --profile PROFILE
                         Anonymization Profile (default: -1)
+  -pj PROJECT, --project PROJECT
+                        Project ID (default: 3)
   -o OUTPUT, --output OUTPUT
                         Output path (default: ./<Accession>.zip)
   -s SERIES_INCLUSION, --series_inclusion SERIES_INCLUSION
