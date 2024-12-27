@@ -29,7 +29,11 @@ def parse_args():
         default=None,
     )
     parser.add_argument(
-        "-o", "--output", help="Output path or directory", default="./<Accession>.zip"
+        "-o",
+        "--output",
+        help="Output path or directory",
+        type=Path,
+        default=None,
     )
     parser.add_argument("-pf", "--profile", help="Anonymization Profile", default=-1)
     parser.add_argument("-pj", "--project", help="Project ID", default=-1)
@@ -54,20 +58,14 @@ def parse_args():
         action="store_true",
         help="List available anonymization profiles",
     )
+    parser.add_argument("-mrn", "--mrn", help="Patient ID to download")
 
     arguments = parser.parse_args()
 
     if not (arguments.list_projects or arguments.list_profiles):
-        assert arguments.url, "URL to API address is required."
-        assert (
-            arguments.acc
-        ), "Accession is required unless listing projects or profiles."
-
-    if arguments.output == "./<Accession>.zip":
-        arguments.output = f"{arguments.acc}.zip"
-    elif Path(arguments.output).is_dir():
-        arguments.output = str(Path(arguments.output) / f"{arguments.acc}.zip")
-        print("Output path is a directory. Saving to: ", arguments.output, flush=True)
+        # At least one of 'acc' or 'mrn' must be provided
+        if not arguments.acc and not arguments.mrn:
+            raise ValueError("Must specify either ACCESSION or --mrn.")
 
     return arguments
 
@@ -144,113 +142,161 @@ def list_profiles(url: str, cred_path: str) -> None:
         )
 
 
+def _build_exam_output_path(base_output: Path, exam: dict, exam_index: int) -> Path:
+    """Generate a unique output path for each exam in case multiple are found.
+
+    Args:
+        base_output (Path): The user-provided output path.
+        exam (dict): The exam object from the API.
+        exam_index (int): Index of the current exam in the loop.
+
+    Returns:
+        Path: The updated output path for this exam.
+    """
+    # - p exists and is dir: create p / accession.zip
+    # - p does not exist and has .zip extension: return p
+    # - p exists and has .zip extension: return p with index appended
+    p = base_output
+    if not p.suffix.lower().endswith(".zip"):
+        # p is supposed to be a directory
+        p.mkdir(parents=True, exist_ok=True)
+        acc_num = exam.get("accessionNumber") or f"exam_{exam_index + 1}"
+        return str(p / f"{acc_num}.zip")
+    elif not p.exists() and p.suffix.lower().endswith(".zip"):
+        return str(p)
+    else:
+        # If user provided a filename, append index to avoid overwriting
+        stem = p.stem
+        suffix = p.suffix
+        return str(p.with_name(f"{stem}_{exam_index + 1}{suffix}"))
+
+
 def download(
-    url, cred_path, accession, output, project, profile, series_inclusion=None
-):
+    url: str,
+    cred_path: str,
+    accession: str,
+    project: int,
+    profile: int,
+    output: Path = None,
+    series_inclusion: str = None,
+    mrn: str = None,
+) -> None:
+    """Download the DICOM data from AIR by accession or MRN, handling multiple exams if found."""
     jwt, _ = authenticate(url, cred_path)
     header = {"Authorization": "Bearer " + jwt}
 
-    # Search for study by accession number
-    study = requests.post(
+    search_params = {
+        "name": "",
+        "mrn": mrn if mrn else "",
+        "accNum": accession if accession else "",
+        "dateRange": {"start": "", "end": "", "label": ""},
+        "modality": "",
+        "sourceId": 1,
+    }
+    exams = requests.post(
         urljoin(url, "secure/search/query-data-source"),
         headers=header,
-        json={
-            "name": "",
-            "mrn": "",
-            "accNum": accession,
-            "dateRange": {"start": "", "end": "", "label": ""},
-            "modality": "",
-            "sourceId": 1,
-        },
-    ).json()["exams"][0]
-
-    # Make a list of all included series
-    series = requests.post(
-        urljoin(url, "secure/search/series"), headers=header, json=study
-    ).json()
-
-    # Filter series based on inclusion patterns, if provided
-    if series_inclusion:
-        inclusion_list = [
-            pattern.strip().lower() for pattern in series_inclusion.split(",")
-        ]
-        original_series_description = [serie["description"] for serie in series]
-        series = [
-            serie
-            for serie in series
-            if (
-                serie["description"]
-                and any(
-                    pattern in serie["description"].lower()
-                    for pattern in inclusion_list
-                )
-            )
-        ]
-        final_series_description = [serie["description"] for serie in series]
-        print(f"Original series (n={len(original_series_description)}): ")
-        print(original_series_description)
-        print(f"Series after filtering (n={len(final_series_description)}): ")
-        print(final_series_description)
-
-    def has_started(download_info):
-        if "downloadId" not in download_info:
-            raise RuntimeError(f"download failed. Server Response: {download_info}")
-        check = requests.post(
-            urljoin(url, "secure/search/download/check"),
-            headers=header,
-            json={"downloadId": download_info["downloadId"], "projectId": project},
+        json=search_params,
+    ).json()["exams"]
+    
+    if len(exams) > 1:
+        print(f"Found {len(exams)} exams.")
+    
+    for i, study in enumerate(exams):
+        # Build a unique output path for each exam
+        exam_output_fp = _build_exam_output_path(output, study, i)
+        exam_output_fp = Path(exam_output_fp)
+        series = requests.post(
+            urljoin(url, "secure/search/series"), headers=header, json=study
         ).json()
-        return check["status"] in ["started", "completed"]
 
-    # Prepare download job
-    download_info = requests.post(
-        urljoin(url, "secure/search/download/start"),
-        headers=header,
-        json={
-            "decompress": False,
-            "name": "Download.zip",
-            "profile": profile,
-            "projectId": project,
-            "series": series,
-            "study": study,
-        },
-    ).json()
+        if series_inclusion:
+            inclusion_list = [
+                pattern.strip().lower() for pattern in series_inclusion.split(",")
+            ]
+            original_series_description = [serie["description"] for serie in series]
+            series = [
+                serie
+                for serie in series
+                if (
+                    serie["description"]
+                    and any(
+                        pattern in serie["description"].lower()
+                        for pattern in inclusion_list
+                    )
+                )
+            ]
+            final_series_description = [serie["description"] for serie in series]
+            print(f"Original series (n={len(original_series_description)}): ")
+            print(original_series_description)
+            print(f"Series after filtering (n={len(final_series_description)}): ")
+            print(final_series_description)
 
-    # Ensure that archive is ready for download
-    while not has_started(download_info):
-        time.sleep(0.1)
+        def has_started(download_info):
+            if "downloadId" not in download_info:
+                if "project" in download_info["reason"]:
+                    print("Project ID is invalid or missing. Available projects:")
+                    list_projects(url, cred_path)
+                elif "profile" in download_info["reason"]:
+                    print("Profile ID is invalid or missing. Available profiles:")
+                    list_profiles(url, cred_path)
+                else:
+                    print("Unknown error occurred during download initiation.")
+                raise RuntimeError(f"Download failed. Server Response: {download_info}")
+            check = requests.post(
+                urljoin(url, "secure/search/download/check"),
+                headers=header,
+                json={"downloadId": download_info["downloadId"], "projectId": project},
+            ).json()
+            return check["status"] in ["started", "completed"]
 
-    # Download archive
-    download_stream = requests.post(
-        urljoin(url, "secure/search/download/zip"),
-        headers={"Upgrade-Insecure-Requests": "1"},
-        data={
-            "params": json.dumps(
-                {
-                    "downloadId": download_info["downloadId"],
-                    "projectId": project,
-                    "name": "Download.zip",
-                }
-            ),
-            "jwt": jwt,
-        },
-        stream=True,
-    )
+        download_info = requests.post(
+            urljoin(url, "secure/search/download/start"),
+            headers=header,
+            json={
+                "decompress": False,
+                "name": "Download.zip",
+                "profile": profile,
+                "projectId": project,
+                "series": series,
+                "study": study,
+            },
+        ).json()
 
-    # Get total size from headers (probably not available though)
-    total_size = int(download_stream.headers.get("Content-Length", 0))
+        while not has_started(download_info):
+            time.sleep(0.1)
 
-    # Save archive to disk with a progress bar
-    with (
-        open(output, "wb") as fd,
-        tqdm(
-            total=total_size, unit="B", unit_scale=True, desc=output, leave=False
-        ) as progress_bar,
-    ):
-        for chunk in download_stream.iter_content(chunk_size=8192):
-            if chunk:
-                fd.write(chunk)
-                progress_bar.update(len(chunk))
+        download_stream = requests.post(
+            urljoin(url, "secure/search/download/zip"),
+            headers={"Upgrade-Insecure-Requests": "1"},
+            data={
+                "params": json.dumps(
+                    {
+                        "downloadId": download_info["downloadId"],
+                        "projectId": project,
+                        "name": "Download.zip",
+                    }
+                ),
+                "jwt": jwt,
+            },
+            stream=True,
+        )
+
+        total_size = int(download_stream.headers.get("Content-Length", 0))
+        with (
+            open(exam_output_fp, "wb") as fd,
+            tqdm(
+                total=total_size,
+                unit="B",
+                unit_scale=True,
+                desc=f"Downloading accession {exam_output_fp.stem}",
+                leave=False,
+            ) as progress_bar,
+        ):
+            for chunk in download_stream.iter_content(chunk_size=8192):
+                if chunk:
+                    fd.write(chunk)
+                    progress_bar.update(len(chunk))
 
 
 def main(args):
@@ -264,13 +310,14 @@ def main(args):
         list_profiles(args.url, args.cred_path)
     else:
         download(
-            args.url,
-            args.cred_path,
-            args.acc,
-            args.output,
-            args.project,
-            args.profile,
-            args.series_inclusion,
+            url=args.url,
+            accession=args.acc,
+            cred_path=args.cred_path,
+            output=args.output,
+            project=args.project,
+            profile=args.profile,
+            series_inclusion=args.series_inclusion,
+            mrn=args.mrn,
         )
 
 

@@ -28,6 +28,9 @@ def get_args():
         ),
     )
     parser.add_argument(
+        "-mrn", "--mrn", help="Patient ID to download"
+    )
+    parser.add_argument(
         "-o", "--output", help="Output path", default="./<Accession>.zip"
     )
     parser.add_argument(
@@ -172,6 +175,8 @@ def run_container(args):
             command.append("-lpj")
         if args.list_profiles:
             command.append("-lpf")
+        if args.mrn:
+            command.extend(["-mrn", args.mrn])
 
         subprocess.run(command)
 
