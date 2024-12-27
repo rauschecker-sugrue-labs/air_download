@@ -15,9 +15,11 @@ def parse_args():
     )
 
     parser.add_argument(
-        "url", help="URL for AIR API, e.g. https://air.<domain>.edu/api/"
+        "url", nargs="?", help="URL for AIR API, e.g. https://air.<domain>.edu/api/"
     )
-    parser.add_argument("acc", metavar="ACCESSION", help="Accession # to download")
+    parser.add_argument(
+        "acc", nargs="?", metavar="ACCESSION", help="Accession # to download"
+    )
     parser.add_argument(
         "-c",
         "--cred-path",
@@ -40,8 +42,26 @@ def parse_args():
         ),
         default=None,
     )
+    parser.add_argument(
+        "-lpj",
+        "--list-projects",
+        action="store_true",
+        help="List available project IDs",
+    )
+    parser.add_argument(
+        "-lpf",
+        "--list-profiles",
+        action="store_true",
+        help="List available anonymization profiles",
+    )
 
     arguments = parser.parse_args()
+
+    if not (arguments.list_projects or arguments.list_profiles):
+        assert arguments.url, "URL to API address is required."
+        assert (
+            arguments.acc
+        ), "Accession is required unless listing projects or profiles."
 
     if arguments.output == "./<Accession>.zip":
         arguments.output = f"{arguments.acc}.zip"
@@ -94,6 +114,34 @@ def get_deid_profiles(url, cred_path):
     for profile in profiles:
         ret.append({k: profile[k] for k in ("id", "name", "description")})
     return ret
+
+
+def list_projects(url: str, cred_path: str) -> None:
+    """List available project IDs from the API.
+
+    Args:
+        url (str): URL for AIR API.
+        cred_path (str): Path to the credentials file.
+    """
+    _, projects = authenticate(url, cred_path)
+    print("Available projects:")
+    for project in projects:
+        print(f"ID: {project['id']}, Name: {project['name']}")
+
+
+def list_profiles(url: str, cred_path: str) -> None:
+    """List available anonymization profiles from the API.
+
+    Args:
+        url (str): URL for AIR API.
+        cred_path (str): Path to the credentials file.
+    """
+    profiles = get_deid_profiles(url, cred_path)
+    print("Available anonymization profiles:")
+    for profile in profiles:
+        print(
+            f"ID: {profile['id']}, Name: {profile['name']}, Description: {profile['description']}"
+        )
 
 
 def download(
@@ -193,9 +241,12 @@ def download(
     total_size = int(download_stream.headers.get("Content-Length", 0))
 
     # Save archive to disk with a progress bar
-    with open(output, "wb") as fd, tqdm(
-        total=total_size, unit="B", unit_scale=True, desc=output, leave=False
-    ) as progress_bar:
+    with (
+        open(output, "wb") as fd,
+        tqdm(
+            total=total_size, unit="B", unit_scale=True, desc=output, leave=False
+        ) as progress_bar,
+    ):
         for chunk in download_stream.iter_content(chunk_size=8192):
             if chunk:
                 fd.write(chunk)
@@ -203,15 +254,24 @@ def download(
 
 
 def main(args):
-    download(
-        args.url,
-        args.cred_path,
-        args.acc,
-        args.output,
-        args.project,
-        args.profile,
-        args.series_inclusion,
-    )
+    if args.list_projects and args.list_profiles:
+        list_projects(args.url, args.cred_path)
+        print()
+        list_profiles(args.url, args.cred_path)
+    elif args.list_projects:
+        list_projects(args.url, args.cred_path)
+    elif args.list_profiles:
+        list_profiles(args.url, args.cred_path)
+    else:
+        download(
+            args.url,
+            args.cred_path,
+            args.acc,
+            args.output,
+            args.project,
+            args.profile,
+            args.series_inclusion,
+        )
 
 
 def cli():

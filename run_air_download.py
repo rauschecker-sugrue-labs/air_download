@@ -20,6 +20,7 @@ def get_args():
 
     parser.add_argument(
         "accession",
+        nargs="?",
         metavar="ACCESSION",
         help=(
             "Accession # to download, or path to csv file with accession #s "
@@ -52,6 +53,12 @@ def get_args():
         "--cred-path",
         help="Login credentials file. If not present, will prompt for AIR_USERNAME and AIR_PASSWORD.",
         default=Path.home() / "air_login.txt",
+    )
+    parser.add_argument(
+        "-lpj", "--list-projects", action="store_true", help="List available project IDs"
+    )
+    parser.add_argument(
+        "-lpf", "--list-profiles", action="store_true", help="List available anonymization profiles"
     )
 
     return parser.parse_args()
@@ -161,6 +168,10 @@ def run_container(args):
 
         if args.series_inclusion:
             command.extend(["-s", args.series_inclusion])
+        if args.list_projects:
+            command.append("-lpj")
+        if args.list_profiles:
+            command.append("-lpf")
 
         subprocess.run(command)
 
