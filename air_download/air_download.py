@@ -7,6 +7,7 @@ import requests
 from dotenv import dotenv_values
 from tqdm import tqdm
 from urllib.parse import urljoin
+from typing import List, Dict, Any
 
 
 def parse_args():
@@ -38,15 +39,6 @@ def parse_args():
     parser.add_argument("-pf", "--profile", help="Anonymization Profile", default=-1)
     parser.add_argument("-pj", "--project", help="Project ID", default=-1)
     parser.add_argument(
-        "-s",
-        "--series_inclusion",
-        help=(
-            "Comma-separated list of series inclusion patterns (case insensitive, 'or' "
-            "logic). Example for T1 type series: 't1,spgr,bravo,mpr'"
-        ),
-        default=None,
-    )
-    parser.add_argument(
         "-lpj",
         "--list-projects",
         action="store_true",
@@ -59,7 +51,33 @@ def parse_args():
         help="List available anonymization profiles",
     )
     parser.add_argument("-mrn", "--mrn", help="Patient ID to download")
-
+    parser.add_argument(
+        "-xm",
+        "--exam_modality_inclusion",
+        help=(
+            "Comma-separated list of exam modality inclusion patterns (case "
+            "insensitive, 'or' logic) for exam . Example: 'MR,CT'"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "-xd",
+        "--exam_description_inclusion",
+        help=(
+            "Comma-separated list of exam description inclusion patterns (case "
+            "insensitive, 'or' logic) for exam . Example: 'BRAIN WITH AND WITHOUT CONTRAST'"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "-s",
+        "--series_inclusion",
+        help=(
+            "Comma-separated list of series inclusion patterns (case insensitive, 'or' "
+            "logic). Example for T1 type series: 't1,spgr,bravo,mpr'"
+        ),
+        default=None,
+    )
     arguments = parser.parse_args()
 
     if not (arguments.list_projects or arguments.list_profiles):
@@ -161,14 +179,44 @@ def _build_exam_output_path(base_output: Path, exam: dict, exam_index: int) -> P
         # p is supposed to be a directory
         p.mkdir(parents=True, exist_ok=True)
         acc_num = exam.get("accessionNumber") or f"exam_{exam_index + 1}"
-        return str(p / f"{acc_num}.zip")
+        return p / f"{acc_num}.zip"
     elif not p.exists() and p.suffix.lower().endswith(".zip"):
-        return str(p)
+        return p
     else:
         # If user provided a filename, append index to avoid overwriting
         stem = p.stem
         suffix = p.suffix
-        return str(p.with_name(f"{stem}_{exam_index + 1}{suffix}"))
+        return p.with_name(f"{stem}_{exam_index + 1}{suffix}")
+
+
+def apply_inclusion_filter(
+    items: List[Dict[str, Any]], field_name: str, patterns: str
+) -> List[Dict[str, Any]]:
+    """
+    Filter items by partial match in the specified field for any of the comma-separated
+    patterns (case-insensitive).
+    Args:
+        items (List[Dict[str, Any]]): A list of dictionaries to be filtered.
+        field_name (str): The key in the dictionaries to apply the filter on.
+        patterns (str): A comma-separated string of patterns to filter by.
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries that match any of the patterns in
+        the specified field.
+    """
+    if not patterns:
+        return items
+    pattern_list = [p.strip().lower() for p in patterns.split(",")]
+    original_count = len(items)
+    print(f"Available {field_name}s:", set([i[field_name] for i in items]))
+    filtered = [
+        i
+        for i in items
+        if i.get(field_name) and any(p in i[field_name].lower() for p in pattern_list)
+    ]
+    print(
+        f"{field_name.capitalize()} filter: from {original_count} originally to {len(filtered)}."
+    )
+    return filtered
 
 
 def download(
@@ -178,8 +226,10 @@ def download(
     project: int,
     profile: int,
     output: Path = None,
-    series_inclusion: str = None,
     mrn: str = None,
+    exam_modality_inclusion: str = None,
+    exam_description_inclusion: str = None,
+    series_inclusion: str = None,
 ) -> None:
     """Download the DICOM data from AIR by accession or MRN, handling multiple exams if found."""
     jwt, _ = authenticate(url, cred_path)
@@ -198,39 +248,30 @@ def download(
         headers=header,
         json=search_params,
     ).json()["exams"]
-    
-    if len(exams) > 1:
-        print(f"Found {len(exams)} exams.")
-    
-    for i, study in enumerate(exams):
+
+    exams = apply_inclusion_filter(exams, "modality", exam_modality_inclusion)
+    exams = apply_inclusion_filter(exams, "description", exam_description_inclusion)
+
+    if len(exams) == 0:
+        print("No exams found, check your search parameters.")
+        return
+
+    for i, study in tqdm(
+        enumerate(exams), desc="Downloading exams", leave=True, total=len(exams)
+    ):
         # Build a unique output path for each exam
         exam_output_fp = _build_exam_output_path(output, study, i)
-        exam_output_fp = Path(exam_output_fp)
         series = requests.post(
             urljoin(url, "secure/search/series"), headers=header, json=study
         ).json()
 
-        if series_inclusion:
-            inclusion_list = [
-                pattern.strip().lower() for pattern in series_inclusion.split(",")
-            ]
-            original_series_description = [serie["description"] for serie in series]
-            series = [
-                serie
-                for serie in series
-                if (
-                    serie["description"]
-                    and any(
-                        pattern in serie["description"].lower()
-                        for pattern in inclusion_list
-                    )
-                )
-            ]
-            final_series_description = [serie["description"] for serie in series]
-            print(f"Original series (n={len(original_series_description)}): ")
-            print(original_series_description)
-            print(f"Series after filtering (n={len(final_series_description)}): ")
-            print(final_series_description)
+        series = apply_inclusion_filter(series, "description", series_inclusion)
+        if len(series) == 0:
+            print(
+                f"No series found for {exam_output_fp.stem}. "
+                "Check your search parameters."
+            )
+            continue
 
         def has_started(download_info):
             if "downloadId" not in download_info:
@@ -318,6 +359,8 @@ def main(args):
             profile=args.profile,
             series_inclusion=args.series_inclusion,
             mrn=args.mrn,
+            exam_modality_inclusion=args.exam_modality_inclusion,
+            exam_description_inclusion=args.exam_description_inclusion,
         )
 
 

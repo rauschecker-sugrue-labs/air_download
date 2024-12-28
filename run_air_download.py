@@ -27,20 +27,9 @@ def get_args():
             "in one column."
         ),
     )
-    parser.add_argument(
-        "-mrn", "--mrn", help="Patient ID to download"
-    )
+    parser.add_argument("-mrn", "--mrn", help="Patient ID to download")
     parser.add_argument(
         "-o", "--output", help="Output path", default="./<Accession>.zip"
-    )
-    parser.add_argument(
-        "-s",
-        "--series_inclusion",
-        help=(
-            "Comma-separated list of series inclusion patterns (case insensitive, 'or' "
-            "logic). Example for T1 type series: 't1,spgr,bravo,mpr'"
-        ),
-        default=None,
     )
     parser.add_argument(
         "-pf",
@@ -58,10 +47,43 @@ def get_args():
         default=Path.home() / "air_login.txt",
     )
     parser.add_argument(
-        "-lpj", "--list-projects", action="store_true", help="List available project IDs"
+        "-lpj",
+        "--list-projects",
+        action="store_true",
+        help="List available project IDs",
     )
     parser.add_argument(
-        "-lpf", "--list-profiles", action="store_true", help="List available anonymization profiles"
+        "-lpf",
+        "--list-profiles",
+        action="store_true",
+        help="List available anonymization profiles",
+    )
+    parser.add_argument(
+        "-xm",
+        "--exam_modality_inclusion",
+        help=(
+            "Comma-separated list of exam modality inclusion patterns (case "
+            "insensitive, 'or' logic) for exam . Example: 'MR,CT'"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "-xd",
+        "--exam_description_inclusion",
+        help=(
+            "Comma-separated list of exam description inclusion patterns (case "
+            "insensitive, 'or' logic) for exam . Example: 'BRAIN WITH AND WITHOUT CONTRAST'"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "-s",
+        "--series_inclusion",
+        help=(
+            "Comma-separated list of series inclusion patterns (case insensitive, 'or' "
+            "logic). Example for T1 type series: 't1,spgr,bravo,mpr'"
+        ),
+        default=None,
     )
 
     return parser.parse_args()
@@ -177,6 +199,10 @@ def run_container(args):
             command.append("-lpf")
         if args.mrn:
             command.extend(["-mrn", args.mrn])
+        if args.exam_modality_inclusion:
+            command.extend(["-xm", args.exam_modality_inclusion])
+        if args.exam_description_inclusion:
+            command.extend(["-xd", args.exam_description_inclusion])
 
         subprocess.run(command)
 
