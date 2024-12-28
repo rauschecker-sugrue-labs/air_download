@@ -7,9 +7,9 @@ From: python:3.11-slim
 
 %post
     # Set working directory
-    cd /app
+    cd /app/air_download
     # Install the Python package and dependencies
-    pip install --no-cache-dir .
+    pip install -e .
 
 %environment
     # Set the PATH environment variable to ensure Singularity can find the installed package
@@ -22,7 +22,7 @@ From: python:3.11-slim
 %files
     # Here, you specify the files to be copied into the container
     setup.py /app/setup.py
-    air_download /app/air_download
+    . /app/air_download
 
 %test
     # Basic test to ensure the image works as expected
