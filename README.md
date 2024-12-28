@@ -66,7 +66,9 @@ Type `air_download -h` for the help text.
 
 ```bash
 $ air_download -h
-usage: air_download [-h] [-c CRED_PATH] [-p PROFILE] [-o OUTPUT] [-xm EXAM_MODALITY_INCLUSION] [-xd EXAM_DESCRIPTION_INCLUSION] [-s SERIES_INCLUSION][-lpj] [-lpf] URL ACCESSION
+usage: air_download [-h] [-c CRED_PATH] [-p PROFILE] [-o OUTPUT] 
+  [-xm EXAM_MODALITY_INCLUSION] [-xd EXAM_DESCRIPTION_INCLUSION] [-s SERIES_INCLUSION]
+  [-lpj] [-lpf] URL ACCESSION
 
 positional arguments:
   URL                   URL for AIR API, e.g. https://air.<domain>.edu/api/
@@ -85,23 +87,30 @@ optional arguments:
   -o OUTPUT, --output OUTPUT
                         Output path
   -xm EXAM_MODALITY_INCLUSION, --exam_modality_inclusion EXAM_MODALITY_INCLUSION
-                        Comma-separated list of exam modality inclusion patterns (case insensitive, 'or' logic).
+                        Comma-separated list of exam modality inclusion patterns 
+                        (case insensitive, 'or' logic).
   -xd EXAM_DESCRIPTION_INCLUSION, --exam_description_inclusion EXAM_DESCRIPTION_INCLUSION
-                        Comma-separated list of exam description inclusion patterns (case insensitive, 'or' logic).
+                        Comma-separated list of exam description inclusion patterns 
+                        (case insensitive, 'or' logic).
   -s SERIES_INCLUSION, --series_inclusion SERIES_INCLUSION
-                        Comma-separated list of series inclusion patterns (case insensitive, 'or' logic). Example for T1 type series: 't1,spgr,bravo,mpr' (default: None)
+                        Comma-separated list of series inclusion patterns 
+                        (case insensitive, 'or' logic). Example for T1 type series: 
+                        't1,spgr,bravo,mpr' (default: None)
   -lpj, --list-projects
                         List available project IDs
   -lpf, --list-profiles
                         List available anonymization profiles
 
 Example use case with MRN:
-  air_download -c air_login.txt https://air.<domain>.edu/api/ -mrn 11111111 -xm MR -xd "BRAIN WITH AND WITHOUT CONTRAST" -s T1 -o my/output/dir
+  air_download -c air_login.txt https://air.<domain>.edu/api/ -mrn 11111111 -xm MR \
+    -xd "BRAIN WITH AND WITHOUT CONTRAST" -s T1 -o my/output/dir
 ```
 
-You can use -lpj or -lpf before specifying ACCESSION (or combined) to get a quick listing of available IDs or profiles.
+You can use -lpj or -lpf before specifying ACCESSION (or combined) to get a quick 
+listing of available IDs or profiles.
 
-From within python, you can also import the module directly, so that it may be integrated with other tools.
+From within python, you can also import the module directly, so that it may be 
+integrated with other tools.
 
 ```python
 import air_download.air_download as air
