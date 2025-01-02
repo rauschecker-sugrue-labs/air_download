@@ -6,6 +6,7 @@ From: python:3.11-slim
     Lab Rauschecker Sugrue Labs
 
 %post
+    chmod -R a+rX /app
     # Set working directory
     cd /app/air_download
     # Install the Python package and dependencies
