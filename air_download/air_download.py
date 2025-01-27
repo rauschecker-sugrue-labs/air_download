@@ -78,6 +78,14 @@ def parse_args():
         ),
         default=None,
     )
+    parser.add_argument(
+        "--only-return-accessions",
+        action="store_true",
+        help=(
+            "Only return the accessions found for the provided search parameters. "
+            "Also writes them (appending) to ``output``/accessions.csv."
+        ),
+    )
     arguments = parser.parse_args()
 
     if not (arguments.list_projects or arguments.list_profiles):
@@ -230,6 +238,7 @@ def download(
     exam_modality_inclusion: str = None,
     exam_description_inclusion: str = None,
     series_inclusion: str = None,
+    only_return_accessions: bool = False,
 ) -> None:
     """Download the DICOM data from AIR by accession or MRN, handling multiple exams if found."""
     jwt, _ = authenticate(url, cred_path)
@@ -254,6 +263,15 @@ def download(
 
     if len(exams) == 0:
         print("No exams found, check your search parameters.")
+        return
+
+    if only_return_accessions:
+        output_csv = output / "accessions.csv"
+        print(f"Writing accessions to {output_csv}")
+        with open(output_csv, "a+") as f:
+            for exam in exams:
+                f.write(f"{exam['accessionNumber']}\n")
+        print("Accessions written to file.")
         return
 
     for i, study in tqdm(
@@ -361,6 +379,7 @@ def main(args):
             mrn=args.mrn,
             exam_modality_inclusion=args.exam_modality_inclusion,
             exam_description_inclusion=args.exam_description_inclusion,
+            only_return_accessions=args.only_return_accessions,
         )
 
 
