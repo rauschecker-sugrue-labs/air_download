@@ -98,9 +98,9 @@ def parse_args():
 
 def authenticate(url, cred_path):
     if cred_path:
-        assert os.path.exists(
-            cred_path
-        ), f"AIR credential file ({cred_path}) does not exist."
+        assert os.path.exists(cred_path), (
+            f"AIR credential file ({cred_path}) does not exist."
+        )
         envs = dotenv_values(cred_path)
         userId = envs["AIR_USERNAME"]
         password = envs["AIR_PASSWORD"]
@@ -270,7 +270,9 @@ def download(
         print(f"Writing accessions to {output_csv}")
         with open(output_csv, "a+") as f:
             for exam in exams:
-                f.write(f"{exam['accessionNumber']}\n")
+                f.write(
+                    f'{mrn},{exam["accessionNumber"]},{exam["dateTime"]},{exam["sex"]},{exam["birthdate"]},"{exam["description"]}"\n'
+                )
         print("Accessions written to file.")
         return
 
@@ -385,3 +387,6 @@ def main(args):
 
 def cli():
     main(parse_args())
+
+if __name__ == "__main__":
+    cli()
