@@ -8,7 +8,7 @@ From: python:3.11-slim
 %post
     chmod -R a+rX /app
     # Set working directory
-    cd /app/air_download
+    cd /app/air-download
     # Install the Python package and dependencies
     pip install -e .
 
@@ -18,12 +18,12 @@ From: python:3.11-slim
 
 %runscript
     # This is the default command that will be executed when the container is run
-    exec air_download "$@"
+    exec python /app/air-download/air_download/air_download.py "$@"
 
 %files
     # Here, you specify the files to be copied into the container
-    setup.py /app/setup.py
-    . /app/air_download
+    # setup.py /app/setup.py
+    . /app/air-download
 
 %test
     # Basic test to ensure the image works as expected
