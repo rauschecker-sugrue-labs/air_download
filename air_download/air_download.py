@@ -271,7 +271,7 @@ def download(
         with open(output_csv, "a+") as f:
             for exam in exams:
                 f.write(
-                    f'{mrn},{exam["accessionNumber"]},{exam["dateTime"]},{exam["sex"]},{exam["birthdate"]},"{exam["description"]}"\n'
+                    f'{mrn},{exam["accessionNumber"]},{exam["dateTime"]},{exam["sex"]},{exam["birthdate"]},"{exam["description"]}",{exam["imageCount"]}\n'
                 )
         print("Accessions written to file.")
         return
