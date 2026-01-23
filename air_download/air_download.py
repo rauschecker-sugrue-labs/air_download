@@ -70,11 +70,38 @@ def parse_args():
         default=None,
     )
     parser.add_argument(
+        "-xxm",
+        "--exam_modality_exclusion",
+        help=(
+            "Comma-separated list of exam modality exclusion patterns (case "
+            "insensitive, 'or' logic) for exam. Example: 'MR,CT'"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "-xxd",
+        "--exam_description_exclusion",
+        help=(
+           "Comma-separated list of exam description exclusion patterns (case "
+            "insensitive, 'or' logic) for exam . Example: 'BRAIN WITH AND WITHOUT CONTRAST'" 
+        ),
+        default=None,
+    )
+    parser.add_argument(
         "-s",
         "--series_inclusion",
         help=(
             "Comma-separated list of series inclusion patterns (case insensitive, 'or' "
             "logic). Example for T1 type series: 't1,spgr,bravo,mpr'"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "-xs",
+        "--series_exclusion",
+        help=(
+            "Comma-separated list of series exclusion patterns (case insensitive, 'or' "
+            "logic). Example for T1 type series: 'Localizer,DWI,Scout'"
         ),
         default=None,
     )
@@ -226,6 +253,39 @@ def apply_inclusion_filter(
     )
     return filtered
 
+def apply_exclusion_filter(
+    items: List[Dict[str, Any]], field_name: str, patterns: str
+) -> List[Dict[str, Any]]:
+    """
+    Filter items by excluding those that have a partial match in the specified field 
+    for any of the comma-separated patterns (case-insensitive).
+
+    Args:
+        items (List[Dict[str, Any]]): A list of dictionaries to be filtered.
+        field_name (str): The key in the dictionaries to apply the filter on.
+        patterns (str): A comma-separated string of patterns to exclude.
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries that do NOT match any of the 
+        patterns in the specified field.
+    """
+    if not patterns:
+        return items
+    
+    pattern_list = [p.strip().lower() for p in patterns.split(",")]
+    original_count = len(items)
+    print(f"Available {field_name}s:", set([i[field_name] for i in items if field_name in i]))
+    
+    filtered = [
+        i
+        for i in items
+        if not i.get(field_name) or all(p not in i[field_name].lower() for p in pattern_list)
+    ]
+    
+    print(
+        f"{field_name.capitalize()} exclusion filter: from {original_count} originally to {len(filtered)}."
+    )
+    return filtered
 
 def download(
     url: str,
@@ -237,7 +297,10 @@ def download(
     mrn: str = None,
     exam_modality_inclusion: str = None,
     exam_description_inclusion: str = None,
+    exam_modality_exclusion: str = None,
+    exam_description_exclusion: str = None,
     series_inclusion: str = None,
+    series_exclusion: str = None,
     only_return_accessions: bool = False,
 ) -> None:
     """Download the DICOM data from AIR by accession or MRN, handling multiple exams if found."""
@@ -259,10 +322,21 @@ def download(
     ).json()["exams"]
 
     exams = apply_inclusion_filter(exams, "modality", exam_modality_inclusion)
-    exams = apply_inclusion_filter(exams, "description", exam_description_inclusion)
-
     if len(exams) == 0:
-        print("No exams found, check your search parameters.")
+        print("No exams found after applying modality inclusion filters. Check your search parameters")
+        return
+    exams = apply_inclusion_filter(exams, "description", exam_description_inclusion)
+    if len(exams) == 0:
+        print("No exams found after applying description inclusion filters. Check your search parameters")
+        return
+        
+    exams = apply_exclusion_filter(exams, "modality", exam_modality_exclusion)
+    if len(exams) == 0:
+        print("No exams found after applying modality exclusion filters. Check your search parameters")
+        return
+    exams = apply_exclusion_filter(exams, "description", exam_description_exclusion)
+    if len(exams) == 0:
+        print("No exams found after applying description exclusion filters. Check your search parameters")
         return
 
     if only_return_accessions:
@@ -286,6 +360,9 @@ def download(
         ).json()
 
         series = apply_inclusion_filter(series, "description", series_inclusion)
+
+        series = apply_exclusion_filter(series, "description", series_exclusion)
+
         if len(series) == 0:
             print(
                 f"No series found for {exam_output_fp.stem}. "
@@ -378,9 +455,12 @@ def main(args):
             project=args.project,
             profile=args.profile,
             series_inclusion=args.series_inclusion,
+            series_exclusion=args.series_exclusion,
             mrn=args.mrn,
             exam_modality_inclusion=args.exam_modality_inclusion,
             exam_description_inclusion=args.exam_description_inclusion,
+            exam_modality_exclusion=args.exam_modality_exclusion,
+            exam_description_exclusion=args.exam_description_exclusion,
             only_return_accessions=args.only_return_accessions,
         )
 

@@ -85,6 +85,33 @@ def get_args():
         ),
         default=None,
     )
+    parser.add_argument(
+        "-xxm",
+        "--exam_modality_exclusion",
+        help=(
+            "Comma-separated list of exam modality exclusion patterns (case "
+            "insensitive, 'or' logic) for exam. Example: 'MR,CT'"
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "-xxd",
+        "--exam_description_exclusion",
+        help=(
+           "Comma-separated list of exam description exclusion patterns (case "
+            "insensitive, 'or' logic) for exam . Example: 'BRAIN WITH AND WITHOUT CONTRAST'" 
+        ),
+        default=None,
+    )
+    parser.add_argument(
+        "-xs",
+        "--series_exclusion",
+        help=(
+            "Comma-separated list of series exclusion patterns (case insensitive, 'or' "
+            "logic). Example for T1 type series: 'Localizer,DWI,Scout'"
+        ),
+        default=None,
+    )
 
     return parser.parse_args()
 
@@ -203,6 +230,12 @@ def run_container(args):
             command.extend(["-xm", args.exam_modality_inclusion])
         if args.exam_description_inclusion:
             command.extend(["-xd", args.exam_description_inclusion])
+        if args.series_exclusion:
+            command.extend(["-xs", args.series_exclusion])
+        if args.exam_modality_exclusion:
+            command.extend(["-xxm", args.exam_modality_exclusion])
+        if args.exam_description_exclusion:
+            command.extend(["-xxd", args.exam_description_exclusion])
 
         subprocess.run(command)
 
