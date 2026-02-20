@@ -89,19 +89,19 @@ air_download 11111111 -c ~/air_login.txt -o output/ -pj 5 -pf 3
 air_download --mrn 12345 -c ~/air_login.txt -o output/ -pj 5 -pf 3
 ```
 
-**Search/list available exams for a patient (no download):**
+**Search/list available exams for a patient or accession (no download):**
+
+```bash
+air_download --mrn 12345 -c ~/air_login.txt --search-only       # prints table to stdout
+air_download 11111111  -c ~/air_login.txt --search-only         # prints table to stdout
+```
+
+Add `-o output/` to also save results to `output/accessions.csv`:
 
 ```bash
 air_download --mrn 12345 -c ~/air_login.txt --search-only -o output/
+air_download 11111111  -c ~/air_login.txt --search-only -o output/
 ```
-
-**Search/get details for a single accession (no download):**
-
-```bash
-air_download 11111111 -c ~/air_login.txt --search-only -o output/
-```
-
-Both commands write matching exams to `output/accessions.csv` without downloading.
 
 **Filter by modality, description, or series:**
 
@@ -172,8 +172,9 @@ options:
                         series: 't1,spgr,bravo,mpr' (default: None)
   --search-only         Only search for exams matching the provided parameters
                         without downloading. Works with both ACCESSION and
-                        --mrn. Writes results to <output>/accessions.csv.
-                        (default: False)
+                        --mrn. Prints a summary table to stdout. If -o is
+                        also provided, writes results to
+                        <output>/accessions.csv. (default: False)
   -v, --verbose         Enable verbose (DEBUG level) logging. (default: False)
   -q, --quiet           Suppress all output except errors. (default: False)
 ```

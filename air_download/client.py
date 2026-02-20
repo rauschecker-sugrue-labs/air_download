@@ -363,9 +363,9 @@ class AIRClient:
             return exams if search_only else None
 
         if search_only:
-            output_dir = output if output is not None else Path(".")
-            output_dir.mkdir(parents=True, exist_ok=True)
-            write_exams_csv(exams, output_dir, mrn=mrn)
+            if output is not None:
+                output.mkdir(parents=True, exist_ok=True)
+                write_exams_csv(exams, output, mrn=mrn)
             return exams
 
         # Default output to current directory if not specified

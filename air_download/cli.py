@@ -4,6 +4,7 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 from air_download.client import AIRClient
 
@@ -120,7 +121,8 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Only search for exams matching the provided parameters without "
             "downloading. Works with both ACCESSION and --mrn. "
-            "Writes results to <output>/accessions.csv."
+            "Prints a summary table to stdout. "
+            "If -o is also provided, writes results to <output>/accessions.csv."
         ),
     )
     # Hidden backward-compatibility alias
@@ -150,6 +152,37 @@ def parse_args() -> argparse.Namespace:
             parser.error("Must specify either ACCESSION or --mrn.")
 
     return arguments
+
+
+def _print_exams_table(exams: list[dict[str, Any]]) -> None:
+    """Print exam search results as a formatted table to stdout.
+
+    Args:
+        exams: List of exam dictionaries from the API.
+    """
+    col_widths = {"mrn": 12, "accession": 14, "date": 12, "mod": 5, "description": 40}
+    header = (
+        f"{'MRN':<{col_widths['mrn']}}"
+        f"{'Accession':<{col_widths['accession']}}"
+        f"{'Date':<{col_widths['date']}}"
+        f"{'Mod':<{col_widths['mod']}}"
+        f"{'Description':<{col_widths['description']}}"
+        f"  Images"
+    )
+    separator = "-" * len(header)
+    print(header)
+    print(separator)
+    for exam in exams:
+        date = (exam.get("dateTime") or "")[:10]
+        mrn = exam.get("patientId", "")
+        print(
+            f"{mrn:<{col_widths['mrn']}}"
+            f"{exam.get('accessionNumber', ''):<{col_widths['accession']}}"
+            f"{date:<{col_widths['date']}}"
+            f"{exam.get('modality', ''):<{col_widths['mod']}}"
+            f"{(exam.get('description') or ''):<{col_widths['description']}}"
+            f"  {exam.get('imageCount', '')}"
+        )
 
 
 def _configure_logging(verbose: bool = False, quiet: bool = False) -> None:
@@ -203,7 +236,7 @@ def main(args: argparse.Namespace) -> None:
                 )
         return
 
-    client.download(
+    exams = client.download(
         accession=args.acc,
         mrn=args.mrn,
         output=args.output,
@@ -214,6 +247,12 @@ def main(args: argparse.Namespace) -> None:
         exam_description_inclusion=args.exam_description_inclusion,
         search_only=args.search_only,
     )
+
+    if args.search_only and exams:
+        if args.output is None:
+            _print_exams_table(exams)
+        else:
+            logger.info("Found %d exam(s). Results written to %s.", len(exams), args.output / "accessions.csv")
 
 
 def cli() -> None:

@@ -59,12 +59,15 @@ def write_exams_csv(
     """Write exam search results to a CSV file.
 
     Appends to the file if it already exists. Writes a header row only if
-    the file is new.
+    the file is new. The MRN column is populated from the user-provided
+    ``mrn`` argument; if not given, falls back to ``patientId`` from each
+    exam object (returned by the API when searching by accession).
 
     Args:
         exams: List of exam dictionaries from the API.
         output_dir: Directory where ``accessions.csv`` will be written.
-        mrn: Patient MRN to include in each row.
+        mrn: Patient MRN to include in each row. If None, the ``patientId``
+            field from each exam is used instead.
 
     Returns:
         Path to the written CSV file.
@@ -80,7 +83,7 @@ def write_exams_csv(
         for exam in exams:
             writer.writerow(
                 [
-                    mrn or "",
+                    mrn or exam.get("patientId", ""),
                     exam.get("accessionNumber", ""),
                     exam.get("dateTime", ""),
                     exam.get("sex", ""),
