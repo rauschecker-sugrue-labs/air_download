@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
         "acc",
         nargs="?",
         metavar="ACCESSION",
-        help="Accession number to download.",
+        help="Accession number to search or download.",
     )
     parser.add_argument(
         "--url",
@@ -119,7 +119,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Only search for exams matching the provided parameters without "
-            "downloading. Writes results to <output>/accessions.csv."
+            "downloading. Works with both ACCESSION and --mrn. "
+            "Writes results to <output>/accessions.csv."
         ),
     )
     # Hidden backward-compatibility alias

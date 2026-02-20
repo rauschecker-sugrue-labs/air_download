@@ -95,7 +95,13 @@ air_download --mrn 12345 -c ~/air_login.txt -o output/ -pj 5 -pf 3
 air_download --mrn 12345 -c ~/air_login.txt --search-only -o output/
 ```
 
-This writes matching exams to `output/accessions.csv` without downloading.
+**Search/get details for a single accession (no download):**
+
+```bash
+air_download 11111111 -c ~/air_login.txt --search-only -o output/
+```
+
+Both commands write matching exams to `output/accessions.csv` without downloading.
 
 **Filter by modality, description, or series:**
 
@@ -128,7 +134,7 @@ usage: air_download [-h] [--url URL] [-c CRED_PATH] [-o OUTPUT] [-pf PROFILE]
 Command line interface to the Automated Image Retrieval (AIR) Portal.
 
 positional arguments:
-  ACCESSION             Accession number to download. (default: None)
+  ACCESSION             Accession number to search or download. (default: None)
 
 options:
   -h, --help            show this help message and exit
@@ -165,8 +171,9 @@ options:
                         (case-insensitive, OR logic). Example for T1 type
                         series: 't1,spgr,bravo,mpr' (default: None)
   --search-only         Only search for exams matching the provided parameters
-                        without downloading. Writes results to
-                        <output>/accessions.csv. (default: False)
+                        without downloading. Works with both ACCESSION and
+                        --mrn. Writes results to <output>/accessions.csv.
+                        (default: False)
   -v, --verbose         Enable verbose (DEBUG level) logging. (default: False)
   -q, --quiet           Suppress all output except errors. (default: False)
 ```
@@ -190,6 +197,9 @@ client.download(mrn="12345", project=5, profile=3, output=Path("output/"))
 
 # Search only (returns list of exam dicts, no download)
 exams = client.search(mrn="12345", exam_modality_inclusion="MR")
+
+# Search by accession (returns exam details without downloading)
+exams = client.search(accession="11111111")
 
 # List projects and profiles
 projects = client.list_projects()
