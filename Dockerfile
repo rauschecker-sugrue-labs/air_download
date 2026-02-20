@@ -5,7 +5,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy only the necessary files to install the package.
-COPY setup.py /app/
+COPY pyproject.toml /app/
 COPY air_download /app/air_download/
 
 # Install the Python package along with dependencies.

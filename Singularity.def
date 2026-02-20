@@ -18,7 +18,7 @@ From: python:3.11-slim
 
 %runscript
     # This is the default command that will be executed when the container is run
-    exec python /app/air-download/air_download/air_download.py "$@"
+    exec air_download "$@"
 
 %files
     # Here, you specify the files to be copied into the container
