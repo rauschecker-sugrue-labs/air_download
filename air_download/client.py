@@ -251,6 +251,9 @@ class AIRClient:
 
         exams = response["exams"]
         logger.debug("Search returned %d exam(s).", len(exams))
+        # Remove patientName from exams
+        for exam in exams:
+            exam.pop("patientName", None)
         exams = apply_inclusion_filter(exams, "modality", exam_modality_inclusion)
         exams = apply_inclusion_filter(exams, "description", exam_description_inclusion)
 
